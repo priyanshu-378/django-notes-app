@@ -2,55 +2,57 @@ version: "3.8"
 
 services:
   nginx:
-    build: ./nginx
-    image: nginx
-    container_name: "nginx_cont"
-    ports:
-      - "80:80"
-    restart: always
-    depends_on:
-      - django_app
-    networks:
-      - notes-app-nw
-
-  django_app:
     build:
-      context: .
-    image: django_app
-    container_name: "django_cont"
+      context: "./nginx"
+    container_name: "nginx"
+    ports: 
+      - "80:80"
+    networks: 
+      - "django-app"
+    restart: "always"  
+    depends_on:
+      - "django-app"
+
+  mysql:
+    image: "mysql"
+    container_name: "mysql"
+    ports:
+      - "3306:3306"
+    networks:
+      - "django-app"
+    volumes:
+      - "django-app:/var/lib/mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: "48159"
+      MYSQL_DATABASE: "django-app"
+    healthcheck:
+      test: ["CMD" , "mysqladmin" , "ping",  "-h",  "localhost" , "-u", "root", "-p48159"]
+      interval: "5s"
+      timeout: "5s"
+      retries: "5"
+    restart: "always"
+
+  django-app:
+    build:
+      context: "."
+    container_name: "django-app"
     ports:
       - "8000:8000"
-    command: sh -c "python manage.py migrate --noinput && gunicorn notesapp.wsgi --bind 0.0.0.0:8000"
-    env_file:
-      - ".env"
-    depends_on:
-      - db
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/admin || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     networks:
-      - notes-app-nw
-
-  db:
-    image: mysql
-    container_name: "db_cont"
+      - "django-app"
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=test_db
-    volumes:
-      - ./data/mysql/db:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    networks:
-      - notes-app-nw
+      DB_NAME: "django-app"
+      DB_HOST: "mysql"
+      DB_USER: "root"
+      DB_PASSWORD: "48159"
+      DB_PORT: "3306"
+    depends_on: 
+      mysql:
+        condition: "service_healthy"
+    restart: "always"
 
 networks:
-  notes-app-nw:
+  django-app:
+
+volumes:
+  django-app:  
